@@ -42,7 +42,15 @@ The grid imports with **zero negative-volume zones** and total volume
 
 ## Regenerate the mesh (optional)
 
-The mesh was produced with `generate_example_mesh.py` (requires `gmsh`):
+Two equivalent sources are provided — both produce the same mesh:
+
+**Gmsh `.geo` script** (native Gmsh, no Python):
+
+```bash
+gmsh three_layer_box.geo -3 -o three_layer_box.msh
+```
+
+**Python script** (Gmsh API):
 
 ```bash
 pip install gmsh
