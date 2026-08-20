@@ -7,4 +7,9 @@ dist/
 *.f3grid
 *.msh
 !tests/fixtures/*.msh
+!examples/*.msh
 .venv/
+
+# never commit credentials
+*.pypirc
+.pypirc

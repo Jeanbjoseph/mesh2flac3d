@@ -24,10 +24,18 @@ It reads meshes through `meshio` (MIT) and **does not import `gmsh`**, so it car
 ## Install
 
 ```bash
-pip install mesh2flac3d          # once published
-# or, from source:
-pip install -e .
+pip install mesh2flac3d
 ```
+
+## Quickstart
+
+A ready-to-run example mesh lives in [`examples/`](examples/) — install, then:
+
+```bash
+mesh2flac3d examples/three_layer_box.msh out.f3grid
+```
+
+See [`examples/README.md`](examples/README.md) for the full 30-second walkthrough.
 
 ## Command line
 
