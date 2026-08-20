@@ -1,5 +1,8 @@
 # mesh2flac3d
 
+[![CI](https://github.com/Jeanbjoseph/mesh2flac3d/actions/workflows/ci.yml/badge.svg)](https://github.com/Jeanbjoseph/mesh2flac3d/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Convert meshes (Gmsh `.msh`, VTK, and anything [meshio](https://github.com/nschloe/meshio) reads) to **Itasca FLAC3D** `.f3grid` grids — **preserving physical groups**:
 
 - **Volume** physical groups → **`ZGROUP`** (zone groups)
