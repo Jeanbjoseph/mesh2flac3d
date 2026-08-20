@@ -1,0 +1,18 @@
+name: Feature request
+description: Suggest a new capability (a format, an element type, an option...)
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you need?
+      description: What are you trying to do that mesh2flac3d can't do today?
+      placeholder: e.g. "Export gridpoint groups too" or "Support the ANSYS .cdb reader".
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Which mesher / solver / workflow is this for? A concrete example helps.

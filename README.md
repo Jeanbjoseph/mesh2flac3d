@@ -99,6 +99,13 @@ pytest -q
 The test fixture is generated with Gmsh (`tests/fixtures/make_testmesh.py`);
 Gmsh is a **test-only** dependency, never used by the package at runtime.
 
+## Reporting a bug
+
+Open an issue: <https://github.com/Jeanbjoseph/mesh2flac3d/issues/new/choose>.
+The guided form asks for your command, the full output, versions, and — most
+useful of all — the input `.msh` that reproduces the problem (zip it if GitHub
+blocks the extension). A small reproducing mesh gets things fixed fastest.
+
 ## License
 
 MIT © AI SIM Engenharia Geotécnica. FLAC3D and Itasca are trademarks of Itasca

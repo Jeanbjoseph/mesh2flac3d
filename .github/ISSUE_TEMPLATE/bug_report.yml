@@ -1,0 +1,60 @@
+name: Bug report
+description: Something went wrong converting a mesh or importing into FLAC3D
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! The more of this you fill in, the faster it gets fixed.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+      placeholder: e.g. "The Salt group is missing from the .f3grid" or "FLAC3D rejects the grid with 'tet volumes <= 0'".
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command / code you ran
+      render: shell
+      placeholder: mesh2flac3d model.msh out.f3grid
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Full output / error message
+      description: Paste the complete terminal output (and the FLAC3D error, if any).
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Run `mesh2flac3d --version` and `python --version`. Note your Gmsh and FLAC3D versions too.
+      placeholder: mesh2flac3d 0.1.0, Python 3.11, Gmsh 4.15, FLAC3D 7.0
+    validations:
+      required: true
+  - type: dropdown
+    id: element-types
+    attributes:
+      label: Element types in the mesh (if known)
+      multiple: true
+      options:
+        - Tetrahedra (T4)
+        - Hexahedra (B8)
+        - Wedges / prisms (W6)
+        - Pyramids (P5)
+        - Not sure
+  - type: textarea
+    id: mesh
+    attributes:
+      label: Mesh file
+      description: |
+        The single most useful thing you can attach is the input mesh.
+        Drag-and-drop the `.msh` here (zip it if GitHub blocks the extension).
+        A small mesh that reproduces the problem is ideal.
