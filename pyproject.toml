@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mesh2flac3d"
-version = "0.1.0"
+version = "0.2.0"
 description = "Convert Gmsh/VTK meshes to Itasca FLAC3D .f3grid, preserving physical groups (ZGROUP/FGROUP) with correct zone winding."
 readme = "README.md"
 requires-python = ">=3.8"

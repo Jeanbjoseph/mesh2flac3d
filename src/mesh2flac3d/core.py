@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import numpy as np
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # meshio cell type -> FLAC3D keyword
 MESHIO_TO_FLAC3D_TYPE = {
@@ -168,7 +168,48 @@ class Grid:
                 ids.append(local + block_base[bi])
             if ids:
                 groups[name] = np.unique(np.concatenate(ids))
+        if groups:
+            return groups
+        # Fallback: some readers (e.g. legacy MSH 2.2) put physical groups in
+        # cell_data['gmsh:physical'] + field_data instead of cell_sets.
+        cell_data = getattr(mesh, "cell_data", None) or {}
+        phys = cell_data.get("gmsh:physical")
+        field = getattr(mesh, "field_data", None) or {}
+        if phys is None or not field:
+            return groups
+        tag_to_name = {int(v[0]): k for k, v in field.items() if len(v) >= 1}
+        acc = {}
+        for bi, arr in enumerate(phys):
+            if bi not in block_base:
+                continue
+            arr = np.asarray(arr)
+            base = block_base[bi]
+            for tag in np.unique(arr):
+                name = tag_to_name.get(int(tag))
+                if name is None:
+                    continue
+                local = np.where(arr == tag)[0]
+                acc.setdefault(name, []).append(local + base)
+        for name, lst in acc.items():
+            groups[name] = np.unique(np.concatenate(lst))
         return groups
+
+
+def _split_slot(name, default_slot):
+    """Resolve a group name into (name, slot).
+
+    A physical group named ``"name@slot"`` maps to FLAC3D group ``name`` in
+    slot ``slot`` — this lets a zone belong to several groups at once (e.g. a
+    well cell that is also part of a reservoir), which FLAC3D supports through
+    slots but a single shared slot does not. Names without ``@`` use
+    ``default_slot``.
+    """
+    if "@" in name:
+        base, slot = name.rsplit("@", 1)
+        base, slot = base.strip(), slot.strip()
+        if base and slot:
+            return base, slot
+    return name, default_slot
 
 
 def _write_table(f, ids, per_line=10):
@@ -197,7 +238,8 @@ def write_f3grid(grid: Grid, path, float_fmt=".10e", slot="Default"):
         if grid.zone_groups:
             f.write("* ZONE GROUPS\n")
             for name, ids in grid.zone_groups.items():
-                f.write(f'ZGROUP "{name}" SLOT "{slot}"\n')
+                gname, gslot = _split_slot(name, slot)
+                f.write(f'ZGROUP "{gname}" SLOT "{gslot}"\n')
                 _write_table(f, ids)
 
         if grid.face_cells:
@@ -211,7 +253,8 @@ def write_f3grid(grid: Grid, path, float_fmt=".10e", slot="Default"):
         if grid.face_groups:
             f.write("* FACE GROUPS\n")
             for name, ids in grid.face_groups.items():
-                f.write(f'FGROUP "{name}" SLOT "{slot}"\n')
+                gname, gslot = _split_slot(name, slot)
+                f.write(f'FGROUP "{gname}" SLOT "{gslot}"\n')
                 _write_table(f, ids)
 
 

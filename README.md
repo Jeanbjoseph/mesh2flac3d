@@ -35,7 +35,24 @@ A ready-to-run example mesh lives in [`examples/`](examples/) — install, then:
 mesh2flac3d examples/three_layer_box.msh out.f3grid
 ```
 
-See [`examples/README.md`](examples/README.md) for the full 30-second walkthrough.
+See [`examples/README.md`](examples/README.md) for the full 30-second walkthrough,
+or [`examples/dean/`](examples/dean/) for the Dean (2006) SPE-79709 reservoir
+benchmark meshes (problems 1–4, SI units).
+
+## Slots (overlapping groups)
+
+A cell often belongs to several groups at once — a well cell is also part of a
+reservoir and of a geological layer. FLAC3D handles this with **slots** (one
+group per slot per zone). Name a physical group `name@slot` and `mesh2flac3d`
+writes it to that slot:
+
+```
+Physical Volume("well@Well")        = { ... };   // ZGROUP "well"      SLOT "Well"
+Physical Volume("reservoir@Region") = { ... };   // ZGROUP "reservoir" SLOT "Region"
+```
+
+The well cells then stay part of the reservoir. A name without `@` uses the
+default slot.
 
 ## Command line
 

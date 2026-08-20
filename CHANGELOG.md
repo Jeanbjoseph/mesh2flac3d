@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — 2026-08-20
+
+- **Slots**: a physical group named `name@slot` is written as `ZGROUP/FGROUP
+  "name" SLOT "slot"`, so overlapping groups (a well cell that is also in a
+  reservoir and a layer) coexist — FLAC3D keeps one group per slot per zone.
+- Read physical groups from `gmsh:physical` cell data as a fallback when a
+  reader does not populate `cell_sets` (e.g. legacy MSH 2.2).
+- Added the **Dean (2006) SPE-79709** benchmark meshes (problems 1–4) under
+  `examples/dean/`, validated on FLAC3D 7.0.
+
 ## 0.1.0 — 2026-08-20
 
 First release.

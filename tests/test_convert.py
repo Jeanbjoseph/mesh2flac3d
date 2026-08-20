@@ -83,6 +83,28 @@ def _build_mixed_mesh():
     return meshio.Mesh(points=pts, cells=cells, cell_sets=sets)
 
 
+def test_slot_from_group_name(tmp_path):
+    """A physical group named "name@slot" writes ZGROUP name in SLOT slot, so
+    overlapping groups (e.g. a well cell also in the reservoir) can coexist."""
+    from mesh2flac3d.core import _split_slot
+    assert _split_slot("well@Well", "Default") == ("well", "Well")
+    assert _split_slot("reservoir", "Default") == ("reservoir", "Default")
+    assert _split_slot("a@b@c", "Default") == ("a@b", "c")
+
+    # end-to-end: two overlapping groups in different slots
+    mesh = _build_mixed_mesh()
+    # rename one set to carry a slot and overlap another
+    sets = dict(mesh.cell_sets)
+    sets["producer@Well"] = sets["Cap"]          # pyramid, slot Well
+    mesh = meshio.Mesh(points=mesh.points, cells=mesh.cells, cell_sets=sets)
+    grid = m2f.Grid.from_meshio(mesh)
+    out = str(tmp_path / "slots.f3grid")
+    m2f.write_f3grid(grid, out)
+    text = open(out, encoding="utf-8").read()
+    assert 'ZGROUP "producer" SLOT "Well"' in text
+    assert 'ZGROUP "Cap" SLOT "Default"' in text
+
+
 def test_wedge_pyramid_winding(tmp_path):
     out = str(tmp_path / "wedp5.f3grid")
     grid = m2f.Grid.from_meshio(_build_mixed_mesh())
