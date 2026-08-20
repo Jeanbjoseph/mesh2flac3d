@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mesh2flac3d"
+version = "0.1.0"
+description = "Convert Gmsh/VTK meshes to Itasca FLAC3D .f3grid, preserving physical groups (ZGROUP/FGROUP) with correct zone winding."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "AI SIM Engenharia Geotecnica" }]
+keywords = ["flac3d", "gmsh", "mesh", "geomechanics", "itasca", "f3grid", "finite-element"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering",
+    "Operating System :: OS Independent",
+]
+dependencies = ["meshio>=5", "numpy>=1.20"]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "gmsh>=4"]
+
+[project.urls]
+Homepage = "https://github.com/Jeanbjoseph/mesh2flac3d"
+Issues = "https://github.com/Jeanbjoseph/mesh2flac3d/issues"
+
+[project.scripts]
+mesh2flac3d = "mesh2flac3d.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
