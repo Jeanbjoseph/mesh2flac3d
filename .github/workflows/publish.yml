@@ -3,6 +3,9 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
+  # Manual trigger — lets us publish from the Actions tab / gh CLI when the
+  # release event does not fire (a known GitHub quirk on re-published releases).
+  workflow_dispatch:
 
 jobs:
   # Run the test suite first so a broken build never reaches PyPI.
@@ -50,6 +53,8 @@ jobs:
           python -m build
 
       - name: Check that the tag matches the package version
+        # Only meaningful for release events; a manual dispatch has no tag.
+        if: github.event_name == 'release'
         run: |
           python - <<'PY'
           import tomllib, os, sys
