@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import numpy as np
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # meshio cell type -> FLAC3D keyword
 MESHIO_TO_FLAC3D_TYPE = {
@@ -65,8 +65,38 @@ ORDER_MIRROR = {
     "hexahedron": [0, 3, 1, 4, 2, 5, 7, 6],
 }
 
+# Tetrahedral decomposition of each zone type, in meshio (VTK) corner order.
+# Used only to compute a true element volume (sum of |sub-tet| volumes) for the
+# self-check/summary — it is independent of the FLAC3D winding order.
+_TET_SPLIT = {
+    "tetra": [(0, 1, 2, 3)],
+    "pyramid": [(0, 1, 2, 4), (0, 2, 3, 4)],
+    "wedge": [(0, 1, 2, 3), (1, 2, 3, 4), (2, 3, 4, 5)],
+    # 6-tet split of a VTK hexahedron around the main diagonal 0-6.
+    "hexahedron": [(0, 1, 2, 6), (0, 2, 3, 6), (0, 3, 7, 6),
+                   (0, 7, 4, 6), (0, 4, 5, 6), (0, 5, 1, 6)],
+}
+
 # cell_set keys produced by meshio readers that are not real physical groups.
 _INTERNAL_SET_PREFIXES = ("gmsh:", "medit:", "cell_set-")
+
+
+def _zone_volumes(points, corners, key):
+    """True volume of each zone in a block, via tetrahedral decomposition.
+
+    `corners` is (n, k) meshio-order corner indices into `points`; `key` is the
+    linear type. Returns an (n,) array of positive volumes (sum of the absolute
+    volumes of the sub-tetrahedra), so it does not depend on node winding.
+    """
+    total = np.zeros(len(corners), dtype=float)
+    for a, b, c, d in _TET_SPLIT[key]:
+        p0 = points[corners[:, a]]
+        p1 = points[corners[:, b]]
+        p2 = points[corners[:, c]]
+        p3 = points[corners[:, d]]
+        det = np.einsum("ij,ij->i", np.cross(p1 - p0, p2 - p0), p3 - p0)
+        total += np.abs(det) / 6.0
+    return total
 
 
 def _is_internal_key(key: str) -> bool:
@@ -80,8 +110,10 @@ def _reorder_zone(points, conn, key):
     FLAC3D requires each zone to have positive volume: the first four corner
     nodes must form a right-handed system, i.e. the scalar triple product
     (p1-p0)x(p2-p0)-(p3-p0) > 0. (Verified against FLAC3D 7.0, which rejects a
-    grid with "tet volumes are <= 0" otherwise.) Returns (n, k) reordered so
-    every zone imports without a negative-volume error.
+    grid with "tet volumes are <= 0" otherwise.) Returns ``(out, det_out)``:
+    ``out`` is the (n, k) reordered connectivity and ``det_out`` the first-four
+    triple product *after* the fix (> 0 for a healthy zone; <= 0 only for a
+    degenerate/zero-volume zone that no winding can save).
     """
     o1 = ORDER[key]
     o2 = ORDER_MIRROR[key]
@@ -92,8 +124,10 @@ def _reorder_zone(points, conn, key):
     c = p[:, 3] - p[:, 0]
     det = np.einsum("ij,ij->i", np.cross(a, b), c)
     # keep o1 where it already yields positive volume (det > 0); else mirror it
+    # (the mirror ordering is a single node transposition, which negates det).
     out = np.where((det > 0)[:, None], conn[:, o1], conn[:, o2])
-    return out
+    det_out = np.abs(det)  # after the fix the triple product is |det|
+    return out, det_out
 
 
 class Grid:
@@ -104,12 +138,18 @@ class Grid:
     keyed by name.
     """
 
-    def __init__(self, points, zone_cells, face_cells, zone_groups, face_groups):
+    def __init__(self, points, zone_cells, face_cells, zone_groups, face_groups,
+                 zone_volumes=None, n_negative_zones=0):
         self.points = points                # (npts, 3) float
         self.zone_cells = zone_cells        # list of (flac3d_type, (n,k) int, base_id)
         self.face_cells = face_cells        # list of (flac3d_type, (n,k) int, base_id)
         self.zone_groups = zone_groups      # {name: np.array of 1-based zone ids}
         self.face_groups = face_groups      # {name: np.array of 1-based face ids}
+        # Self-check metadata (see summary()):
+        self.zone_volumes = (                # (nzones,) true volume, zone-id order
+            np.asarray(zone_volumes, dtype=float) if zone_volumes is not None
+            else np.zeros(0))
+        self.n_negative_zones = int(n_negative_zones)  # zones FLAC3D would reject
 
     @classmethod
     def from_meshio(cls, mesh, keep_faces=True):
@@ -123,15 +163,20 @@ class Grid:
         face_block_base = {}
         zid = 0
         fid = 0
+        vol_blocks = []        # per-block (n,) true volumes, in zone-id order
+        n_negative = 0         # zones with non-positive volume after winding fix
         for bi, cb in enumerate(mesh.cells):
             ct = cb.type
             data = np.asarray(cb.data)
             if ct in ZONE_TYPES:
                 key = ZONE_TYPES[ct]
                 corners = data[:, : len(ORDER[key])]
-                conn = _reorder_zone(points, corners, key)
+                vols = _zone_volumes(points, corners, key)
+                conn, det_out = _reorder_zone(points, corners, key)
+                n_negative += int(np.count_nonzero(det_out <= 0.0))
                 zone_block_base[bi] = zid + 1
                 zone_cells.append((MESHIO_TO_FLAC3D_TYPE[key], conn, zid + 1))
+                vol_blocks.append(vols)
                 zid += len(conn)
             elif keep_faces and ct in FACE_TYPES:
                 key = FACE_TYPES[ct]
@@ -146,7 +191,10 @@ class Grid:
             cls._resolve_groups(mesh, face_block_base, FACE_TYPES)
             if keep_faces else {}
         )
-        return cls(points, zone_cells, face_cells, zone_groups, face_groups)
+        zone_volumes = (np.concatenate(vol_blocks) if vol_blocks
+                        else np.zeros(0))
+        return cls(points, zone_cells, face_cells, zone_groups, face_groups,
+                   zone_volumes=zone_volumes, n_negative_zones=n_negative)
 
     @staticmethod
     def _resolve_groups(mesh, block_base, type_filter):
@@ -193,6 +241,48 @@ class Grid:
         for name, lst in acc.items():
             groups[name] = np.unique(np.concatenate(lst))
         return groups
+
+    def summary(self, slot="Default"):
+        """Return a plain-dict report of the grid — counts, groups (by slot),
+        bounding box and volume, plus the self-check ``negative_volume_zones``
+        (0 means every zone imports into FLAC3D without a volume error).
+        """
+        n_zones = sum(len(c[1]) for c in self.zone_cells)
+        n_faces = sum(len(c[1]) for c in self.face_cells)
+        zones_by_type = {}
+        for ftype, conn, _ in self.zone_cells:
+            zones_by_type[ftype] = zones_by_type.get(ftype, 0) + len(conn)
+
+        def _grp(groups):
+            out = {}
+            for name, ids in groups.items():
+                gname, gslot = _split_slot(name, slot)
+                out[gname] = {"slot": gslot, "count": int(len(ids))}
+            return out
+
+        if len(self.points):
+            lo = self.points.min(axis=0)
+            hi = self.points.max(axis=0)
+            bbox = {"min": [float(v) for v in lo], "max": [float(v) for v in hi]}
+        else:
+            bbox = {"min": [], "max": []}
+
+        return {
+            "version": __version__,
+            "points": int(len(self.points)),
+            "zones": int(n_zones),
+            "faces": int(n_faces),
+            "zones_by_type": zones_by_type,
+            "zone_groups": _grp(self.zone_groups),
+            "face_groups": _grp(self.face_groups),
+            "slots": sorted({v["slot"] for v in _grp(self.zone_groups).values()}
+                            | {v["slot"] for v in _grp(self.face_groups).values()}),
+            "total_volume": float(self.zone_volumes.sum()),
+            "min_zone_volume": (float(self.zone_volumes.min())
+                                if len(self.zone_volumes) else 0.0),
+            "negative_volume_zones": int(self.n_negative_zones),
+            "bbox": bbox,
+        }
 
 
 def _split_slot(name, default_slot):

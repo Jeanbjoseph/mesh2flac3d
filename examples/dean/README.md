@@ -17,15 +17,25 @@ conditions, not geometry).
 
 ## Run any of them
 
+The meshed `.msh` files are **included**, so no meshing tool is required —
+just convert:
+
 ```bash
-gmsh problem_1_2.geo -3 -o problem_1_2.msh      # needs gmsh
-mesh2flac3d problem_1_2.msh problem_1_2.f3grid
+mesh2flac3d problem_1_2.msh problem_1_2.f3grid --check
 ```
 
-Then in FLAC3D: `zone import 'problem_1_2.f3grid'`.
+`--check` computes every zone volume and exits non-zero if any is
+non-positive, so you can confirm the grid is FLAC3D-ready without opening
+FLAC3D. Then in FLAC3D: `zone import 'problem_1_2.f3grid'`.
 
 Each grid imports into FLAC3D 7 with **zero negative-volume zones** and the
 group counts above.
+
+To regenerate a `.msh` after editing its `.geo` (needs gmsh):
+
+```bash
+gmsh problem_1_2.geo -3 -o problem_1_2.msh
+```
 
 ## Slots — how overlapping groups are kept
 

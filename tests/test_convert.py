@@ -83,6 +83,20 @@ def _build_mixed_mesh():
     return meshio.Mesh(points=pts, cells=cells, cell_sets=sets)
 
 
+def _build_inverted_hex_mesh():
+    """A single unit hexahedron whose node order is deliberately left-handed
+    (nodes listed clockwise on the bottom face), to exercise B8 winding
+    correction and the true-volume self-check independently of the wedge case."""
+    # VTK hex order, but bottom face wound clockwise -> negative orientation.
+    pts = np.array([
+        [0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0],   # bottom (clockwise)
+        [0, 0, 1], [0, 1, 1], [1, 1, 1], [1, 0, 1],   # top
+    ], float)
+    cells = [("hexahedron", np.array([[0, 1, 2, 3, 4, 5, 6, 7]]))]
+    sets = {"block": [np.array([0])]}
+    return meshio.Mesh(points=pts, cells=cells, cell_sets=sets)
+
+
 def test_slot_from_group_name(tmp_path):
     """A physical group named "name@slot" writes ZGROUP name in SLOT slot, so
     overlapping groups (e.g. a well cell also in the reservoir) can coexist."""
@@ -113,6 +127,48 @@ def test_wedge_pyramid_winding(tmp_path):
     assert len(zones) == 7  # 6 wedges + 1 pyramid
     assert _first4_positive(pts, zones) == 0
     assert set(grid.zone_groups) == {"Overburden", "Salt", "Underburden", "Cap"}
+
+
+def test_inverted_hex_winding_and_volume(tmp_path):
+    """A left-handed unit hex must be fixed to positive volume, and the
+    true-volume self-check must report exactly 1.0 with zero rejected zones."""
+    grid = m2f.Grid.from_meshio(_build_inverted_hex_mesh())
+    out = str(tmp_path / "hex.f3grid")
+    m2f.write_f3grid(grid, out)
+    pts, zones = _read_f3grid_zones(out)
+    assert len(zones) == 1 and len(zones[0]) == 8
+    assert _first4_positive(pts, zones) == 0        # winding fixed
+    s = grid.summary()
+    assert s["negative_volume_zones"] == 0
+    assert s["zones_by_type"] == {"B8": 1}
+    assert abs(s["total_volume"] - 1.0) < 1e-9      # unit cube volume
+
+
+def test_summary_volume_and_slots(tmp_path):
+    """summary() reports correct volume, zero rejects and the slots present."""
+    mesh = _build_mixed_mesh()
+    sets = dict(mesh.cell_sets)
+    sets["producer@Well"] = sets["Cap"]             # add an overlapping slot
+    mesh = meshio.Mesh(points=mesh.points, cells=mesh.cells, cell_sets=sets)
+    grid = m2f.Grid.from_meshio(mesh)
+    s = grid.summary()
+    assert s["negative_volume_zones"] == 0
+    assert s["zones"] == 7
+    assert s["total_volume"] > 0
+    assert "Well" in s["slots"] and "Default" in s["slots"]
+    # the 100x100 x 90-tall prism stack has volume 100*100*90 = 9e5, plus the
+    # apex pyramid (base 100x100, height 30) = 1e5 -> 1e6 total.
+    assert abs(s["total_volume"] - 1.0e6) < 1.0
+
+
+def test_check_flag_exit_code(msh, tmp_path):
+    """`mesh2flac3d --check` returns 0 on a healthy mesh (no negative zones)."""
+    out = str(tmp_path / "chk.f3grid")
+    rc = subprocess.run(
+        [sys.executable, "-m", "mesh2flac3d.cli", msh, out, "--check", "-q"],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
 
 
 def test_convert_preserves_groups(msh, tmp_path):

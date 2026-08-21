@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-08-21
+
+- **Volume self-check**: every zone's true volume is computed (tetrahedral
+  decomposition, independent of winding). `Grid.summary()` reports the total
+  volume, the smallest zone volume and `negative_volume_zones` — the count of
+  zones FLAC3D would reject. This lets you certify a grid is import-ready
+  *without opening FLAC3D*.
+- **CLI** `--check` (exit non-zero if any zone has non-positive volume — handy
+  in CI/pipelines) and `--json` (machine-readable grid summary).
+- **Examples now run without gmsh**: the Dean `.msh` meshes are shipped
+  pre-generated, so `pip install mesh2flac3d` plus one command reproduces each
+  benchmark. The `.geo` sources remain for anyone who wants to regenerate them.
+- More tests: inverted-hexahedron winding, volume/slot summary, and the
+  `--check` exit code.
+
 ## 0.2.0 — 2026-08-20
 
 - **Slots**: a physical group named `name@slot` is written as `ZGROUP/FGROUP

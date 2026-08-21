@@ -61,6 +61,8 @@ mesh2flac3d model.msh model.f3grid
 mesh2flac3d model.msh                 # -> model.f3grid
 mesh2flac3d model.msh out.f3grid --dat out.dat   # also write a FLAC3D command skeleton
 mesh2flac3d model.msh --no-faces      # zones only
+mesh2flac3d model.msh --check         # exit non-zero if any zone has bad volume
+mesh2flac3d model.msh --json          # machine-readable grid summary
 ```
 
 Example output:
@@ -70,7 +72,12 @@ Example output:
   points: 350  zones: 1218  faces: 522
   zone groups: Underburden(401), Salt(414), Overburden(403)
   face groups: Top(90), Bottom(90), Sides(342)
+  total volume: 900000   negative-volume zones: 0 [OK]
 ```
+
+`negative-volume zones: 0` certifies the grid imports into FLAC3D without a
+volume error — computed here, so you don't have to open FLAC3D to find out.
+Use `--check` to turn that into an exit code for CI/pipelines.
 
 ## Python API
 
@@ -80,6 +87,9 @@ import mesh2flac3d as m2f
 grid = m2f.convert("model.msh", "model.f3grid")
 print(grid.zone_groups.keys())   # dict_keys(['Underburden', 'Salt', 'Overburden'])
 print(grid.face_groups.keys())   # dict_keys(['Top', 'Bottom', 'Sides'])
+
+s = grid.summary()
+print(s["total_volume"], s["negative_volume_zones"])  # 900000.0 0
 ```
 
 ## Supported elements

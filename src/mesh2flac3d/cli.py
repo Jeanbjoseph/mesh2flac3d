@@ -24,6 +24,11 @@ def build_parser():
                    help="force meshio input format instead of inferring")
     p.add_argument("--dat", metavar="FILE", default=None,
                    help="also write a FLAC3D command-file skeleton (.dat)")
+    p.add_argument("--check", action="store_true",
+                   help="exit non-zero if any zone has non-positive volume "
+                        "(would be rejected by FLAC3D)")
+    p.add_argument("--json", action="store_true",
+                   help="print the grid summary as JSON instead of text")
     p.add_argument("-q", "--quiet", action="store_true", help="suppress summary")
     p.add_argument("--version", action="version", version=f"mesh2flac3d {__version__}")
     return p
@@ -47,19 +52,35 @@ def main(argv=None):
         from .dat import write_dat_skeleton
         write_dat_skeleton(args.dat, output, grid)
 
-    if not args.quiet:
-        nz = sum(len(c[1]) for c in grid.zone_cells)
-        nf = sum(len(c[1]) for c in grid.face_cells)
+    summary = grid.summary(slot=args.slot)
+
+    if args.json:
+        import json
+        summary["input"] = args.input
+        summary["output"] = output
+        print(json.dumps(summary, indent=2))
+    elif not args.quiet:
+        nz, nf = summary["zones"], summary["faces"]
         print(f"[mesh2flac3d] {args.input} -> {output}")
-        print(f"  points: {len(grid.points)}  zones: {nz}  faces: {nf}")
+        print(f"  points: {summary['points']}  zones: {nz}  faces: {nf}")
         if grid.zone_groups:
             print("  zone groups: " + ", ".join(
                 f"{k}({len(v)})" for k, v in grid.zone_groups.items()))
         if grid.face_groups:
             print("  face groups: " + ", ".join(
                 f"{k}({len(v)})" for k, v in grid.face_groups.items()))
+        neg = summary["negative_volume_zones"]
+        flag = "OK" if neg == 0 else f"!! {neg} REJECTED BY FLAC3D"
+        print(f"  total volume: {summary['total_volume']:.6g}"
+              f"   negative-volume zones: {neg} [{flag}]")
         if args.dat:
             print(f"  command skeleton: {args.dat}")
+
+    if args.check and summary["negative_volume_zones"] > 0:
+        print(f"[mesh2flac3d] CHECK FAILED: "
+              f"{summary['negative_volume_zones']} non-positive-volume zone(s)",
+              file=sys.stderr)
+        return 1
     return 0
 
 

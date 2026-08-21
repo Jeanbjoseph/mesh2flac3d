@@ -8,6 +8,7 @@ dist/
 *.msh
 !tests/fixtures/*.msh
 !examples/*.msh
+!examples/**/*.msh
 .venv/
 
 # never commit credentials
